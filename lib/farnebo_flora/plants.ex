@@ -22,6 +22,13 @@ defmodule FarneboFlora.Plants do
     Repo.all(Plant)
   end
 
+  def list_all_plants_in_frequency_class(freq_class) do
+    Plant
+    |> from()
+    |> where(frequency_class: ^freq_class)
+    |> Repo.all()
+  end
+
   @doc """
   Gets a single plant.
 
