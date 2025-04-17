@@ -1,0 +1,51 @@
+<.header>
+  Vilda växter funna i Österfärnebo på 80-talet
+  <%!-- <:actions>
+    <.link patch={~p"/plants/new"}>
+      <.button>New Plant</.button>
+    </.link>
+  </:actions> --%>
+</.header>
+
+<.simple_form for={@filter_form} phx-change="filter" class="mb-8">
+  <.input
+    field={@filter_form[:family_id]}
+    type="select"
+    label="Filtrera efter familj"
+    options={@families}
+    prompt="Alla familjer"
+  />
+</.simple_form>
+
+<.table
+  id="plants"
+  rows={@streams.plants}
+  row_click={fn {_id, plant} -> JS.navigate(~p"/plants/#{plant}") end}
+>
+  <:col :let={{_id, plant}} label="Namn">{String.capitalize(plant.name)}</:col>
+  <:col :let={{_id, plant}} label="Latinskt namn">{plant.latin_name}</:col>
+  <:col :let={{_id, plant}} label="Lokalt namn">{plant.local_name}</:col>
+  <:col :let={{_id, plant}} label="Plats och info">{plant.location}</:col>
+  <:action :let={{_id, plant}}>
+    <div class="sr-only">
+      <.link navigate={~p"/plants/#{plant}"}>Show</.link>
+    </div>
+    <.link patch={~p"/plants/#{plant}/edit"}>Edit</.link>
+  </:action>
+</.table>
+
+<.modal
+  :if={@live_action in [:new, :edit]}
+  id="plant-modal"
+  show
+  on_cancel={JS.patch(~p"/plants")}
+>
+  <.live_component
+    module={FarneboFloraWeb.PlantLive.FormComponent}
+    id={@plant.id || :new}
+    title={@page_title}
+    action={@live_action}
+    plant={@plant}
+    patch={~p"/plants"}
+  />
+</.modal>

@@ -35,3 +35,4 @@ farnebo_flora-*.tar
 npm-debug.log
 /assets/node_modules/
 
+.iex.exs
