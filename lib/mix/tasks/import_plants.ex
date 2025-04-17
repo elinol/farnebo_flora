@@ -21,7 +21,6 @@ defmodule Mix.Tasks.ImportPlants do
           |> File.read!()
           |> parse_plant_file()
           |> import_plants()
-          |> IO.inspect()
 
           Mix.shell().info("Import completed successfully!")
         else
@@ -64,16 +63,17 @@ defmodule Mix.Tasks.ImportPlants do
       |> String.replace(~r/^Familjen\s+/, "")
       |> String.replace(".", "")
 
-    # Parse each plant line
-    plants =
-      Enum.map(plant_lines, fn line ->
-        parse_plant_line(line, family_name)
+    # Parse each plant line, keeping track of the previous Latin name
+    {plants, _} =
+      Enum.map_reduce(plant_lines, nil, fn line, prev_latin_name ->
+        plant = parse_plant_line(line, family_name, prev_latin_name)
+        {plant, plant.latin_name}
       end)
 
     %{family: family_name, plants: plants}
   end
 
-  defp parse_plant_line(line, family_name) do
+  defp parse_plant_line(line, family_name, prev_latin_name) do
     # Parse plant details from line
     # Format: Name, Latin name: frequency, location.
     line = String.trim(line)
@@ -88,18 +88,40 @@ defmodule Mix.Tasks.ImportPlants do
 
     # Get local name if any
     {name, local_name} =
-      case String.split(name_part, "e.", parts: 2) do
-        [name] -> {String.trim(name), nil}
-        [name, local_name] -> {String.trim(name), String.trim(local_name)}
+      case String.split(name_part, "e.", parts: 2, trim: true) do
+        [name] ->
+          {String.trim(name), nil}
+
+        [name, local_name] ->
+          local_name = String.downcase(local_name)
+          name = String.downcase(name)
+          {String.trim(name), String.trim(local_name)}
       end
 
     # Extract Latin name and the remainder
-    # TODO: Get full latin name from previous plant if first part is shortened
     {latin_name, freq_location} =
       case String.split(details_part, ":", parts: 2) do
         # Handle case with no colon
         [latin] -> {String.trim(latin), ""}
         [latin, rest] -> {String.trim(latin), String.trim(rest)}
+      end
+
+    # If the Latin name starts with an abbreviated genus (e.g., "C.") and we have a previous Latin name,
+    # use the previous Latin name's genus
+    latin_name =
+      if prev_latin_name != nil do
+        case Regex.run(~r/^([A-Z])\.\s*(.+)$/, latin_name) do
+          [_full_string, _abbreviated_genus, rest] ->
+            # Get the genus from the previous Latin name
+            [prev_genus | _] = String.split(prev_latin_name, " ")
+            # Replace the abbreviated genus with the full one
+            "#{prev_genus} #{rest}"
+
+          _ ->
+            latin_name
+        end
+      else
+        latin_name
       end
 
     # Extract frequency and location
@@ -163,7 +185,7 @@ defmodule Mix.Tasks.ImportPlants do
         family =
           case Repo.get_by(Family, name: family_name) do
             nil ->
-              {:ok, family} = %Family{name: family_name} |> Repo.insert()
+              {:ok, family} = %Family{name: String.downcase(family_name)} |> Repo.insert()
               family
 
             existing ->
@@ -174,11 +196,12 @@ defmodule Mix.Tasks.ImportPlants do
         Enum.each(plants, fn plant_data ->
           %Plant{}
           |> Plant.changeset(%{
-            name: plant_data.name,
+            name: String.downcase(plant_data.name),
             family_id: family.id,
             latin_name: plant_data.latin_name,
             frequency_class: plant_data.frequency,
-            location: plant_data.location
+            location: plant_data.location,
+            local_name: plant_data.local_name
           })
           |> Repo.insert!()
         end)
