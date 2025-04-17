@@ -2,11 +2,13 @@ defmodule FarneboFlora.Plants.Plant do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias FarneboFlora.Plants.FrequencyClass
+
   schema "plants" do
     field :name, :string
     field :latin_name, :string
     field :local_name, :string
-    field :frequency_class, :string
+    field :frequency_class, FrequencyClass
     field :location, :string
     field :seen_in_eighties, :boolean, default: true
     field :seen_now, :boolean, default: false
